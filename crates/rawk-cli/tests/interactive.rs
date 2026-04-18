@@ -42,8 +42,7 @@ fn run_rawk_interactive_from_file(input: &[u8]) -> std::process::Output {
 #[test]
 fn interactive_mode_script_on_command_line() {
     let script = "{ print $1 }";
-    // Send invalid UTF-8 to force interactive mode to exit after the inputs.
-    let input = b"Beth 4.00 0\nDan 3.75 0\n\xff";
+    let input = b"Beth 4.00 0\nDan 3.75 0\n";
 
     let output = run_rawk_interactive(script, input);
 
@@ -64,8 +63,7 @@ fn interactive_mode_script_on_command_line() {
 
 #[test]
 fn interactive_mode_script_from_file() {
-    // Send invalid UTF-8 to force interactive mode to exit after the inputs.
-    let input = b"Beth 4.00 0\nDan 3.75 0\n\xff";
+    let input = b"Beth 4.00 0\nDan 3.75 0\n";
 
     let output = run_rawk_interactive_from_file(input);
 
@@ -87,7 +85,7 @@ fn interactive_mode_script_from_file() {
 #[test]
 fn print_filenames_with_filenames_builtin() {
     let script = "{ print FILENAME }";
-    let input = b"Beth 4.00 0\nDan 3.75 0\n\xff";
+    let input = b"Beth 4.00 0\nDan 3.75 0\n";
 
     let output = run_rawk_interactive(script, input);
 
@@ -107,7 +105,7 @@ fn print_filenames_with_filenames_builtin() {
 #[test]
 fn interactive_mode_prints_runtime_error_to_stderr() {
     let script = "{ print $1 / 0 }";
-    let input = b"42\n\xff";
+    let input = b"42\n";
 
     let output = run_rawk_interactive(script, input);
 
