@@ -103,8 +103,9 @@ fn interactive_mode(script: &str, field_separator: Option<String>) {
         io::stdout().flush().unwrap();
 
         input.clear();
-        if io::stdin().read_line(&mut input).is_err() {
-            break;
+        match io::stdin().read_line(&mut input) {
+            Ok(0) | Err(_) => break,
+            Ok(_) => {}
         }
 
         let (output_lines, runtime_error) =
