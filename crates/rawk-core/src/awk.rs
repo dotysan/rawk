@@ -71,7 +71,7 @@ impl Awk {
     /// collected before the error is still returned alongside the error message.
     pub fn run(
         &self,
-        input: Vec<String>,
+        input: impl IntoIterator<Item = String> + 'static,
         filename: Option<String>,
         field_separator: Option<String>,
     ) -> (Vec<String>, Option<String>) {
