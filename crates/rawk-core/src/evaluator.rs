@@ -6,6 +6,7 @@ use crate::{
 use regex::Regex;
 use std::cell::Cell;
 use std::collections::HashMap;
+use std::io::Write;
 
 struct FunctionCallResult {
     value: String,
@@ -43,6 +44,7 @@ pub struct Evaluator<'a> {
     return_value: Option<String>,
     has_output: bool,
     runtime_error: Option<String>,
+    output_writer: Option<Box<dyn Write>>,
 }
 
 impl<'a> Evaluator<'a> {
@@ -78,7 +80,13 @@ impl<'a> Evaluator<'a> {
             return_value: None,
             has_output: false,
             runtime_error: None,
+            output_writer: None,
         }
+    }
+
+    pub fn with_writer(mut self, writer: Box<dyn Write>) -> Self {
+        self.output_writer = Some(writer);
+        self
     }
 
     pub fn with_field_separator(mut self, fs: String) -> Self {
@@ -297,7 +305,14 @@ impl<'a> Evaluator<'a> {
         if generated.is_empty() {
             return;
         }
-        output.extend(generated);
+        if let Some(writer) = self.output_writer.as_mut() {
+            for s in &generated {
+                let _ = writer.write_all(s.as_bytes());
+            }
+            let _ = writer.flush();
+        } else {
+            output.extend(generated);
+        }
         self.has_output = true;
     }
 
