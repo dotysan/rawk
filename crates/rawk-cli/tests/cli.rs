@@ -1,3 +1,4 @@
+use std::io::Write;
 use std::process::Command;
 
 fn run_rawk(script: &str) -> std::process::Output {
@@ -41,6 +42,27 @@ fn run_rawk_no_args() -> std::process::Output {
     let rawk = env!("CARGO_BIN_EXE_rawk");
 
     Command::new(rawk).output().expect("failed to run rawk")
+}
+
+fn run_rawk_with_input(script: &str, input: &str) -> std::process::Output {
+    let rawk = env!("CARGO_BIN_EXE_rawk");
+
+    let mut child = Command::new(rawk)
+        .arg(script)
+        .stdin(std::process::Stdio::piped())
+        .stdout(std::process::Stdio::piped())
+        .stderr(std::process::Stdio::piped())
+        .spawn()
+        .expect("failed to run rawk");
+
+    child
+        .stdin
+        .as_mut()
+        .expect("failed to open stdin")
+        .write_all(input.as_bytes())
+        .expect("failed to write to stdin");
+
+    child.wait_with_output().expect("failed to read stdout")
 }
 
 #[test]
@@ -299,5 +321,37 @@ fn field_separator_long_flag_splits_fields() {
     assert_eq!(lines.next(), Some("5.50"));
     assert_eq!(lines.next(), Some("4.25"));
     assert!(lines.next().is_none(), "stdout: {stdout}");
+    assert!(output.stderr.is_empty());
+}
+
+#[test]
+fn sub_with_target_replaces_first_occurrence() {
+    let script = r#"{ sub(/foo/, "bar", $0); print }"#;
+
+    let output = run_rawk_with_input(script, "foo foo foo\n");
+
+    assert!(
+        output.status.success(),
+        "stderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert_eq!(stdout.trim(), "bar foo foo");
+    assert!(output.stderr.is_empty());
+}
+
+#[test]
+fn gsub_with_target_replaces_all_occurrences() {
+    let script = r#"{ gsub(/foo/, "bar", $0); print }"#;
+
+    let output = run_rawk_with_input(script, "foo foo foo\n");
+
+    assert!(
+        output.status.success(),
+        "stderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert_eq!(stdout.trim(), "bar bar bar");
     assert!(output.stderr.is_empty());
 }

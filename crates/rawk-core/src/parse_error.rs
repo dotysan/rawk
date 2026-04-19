@@ -6,7 +6,6 @@ pub enum ParseErrorKind {
     ExpectedStatement,
     ExpectedIdentifier,
     UnsupportedStatement,
-    UnsupportedSubTarget,
     ExpectedLeftParen,
     ExpectedLeftBrace,
     ExpectedRightSquareBracket,
@@ -47,11 +46,6 @@ impl std::fmt::Display for ParseError<'_> {
             ParseErrorKind::UnsupportedStatement => write!(
                 f,
                 "unexpected token {:?} ({:?}) at byte {}: unsupported statement syntax",
-                self.token.kind, self.token.literal, self.token.span.start
-            ),
-            ParseErrorKind::UnsupportedSubTarget => write!(
-                f,
-                "unexpected token {:?} ({:?}) at byte {}: sub target argument is not supported",
                 self.token.kind, self.token.literal, self.token.span.start
             ),
             ParseErrorKind::ExpectedLeftParen => write!(
@@ -173,19 +167,6 @@ mod tests {
         assert_eq!(
             format!("{err}"),
             "unexpected token Plus (\"+\") at byte 6: unsupported statement syntax"
-        );
-    }
-
-    #[test]
-    fn display_unsupported_sub_target_error() {
-        let err = parse_error(
-            ParseErrorKind::UnsupportedSubTarget,
-            Token::new(TokenKind::Comma, ",", 12),
-        );
-
-        assert_eq!(
-            format!("{err}"),
-            "unexpected token Comma (\",\") at byte 12: sub target argument is not supported"
         );
     }
 

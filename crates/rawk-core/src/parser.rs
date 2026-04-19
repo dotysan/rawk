@@ -117,10 +117,6 @@ impl<'a> Parser<'a> {
         self.parse_error(ParseErrorKind::UnsupportedStatement)
     }
 
-    fn unsupported_sub_target(&self) -> ParseError<'a> {
-        self.parse_error(ParseErrorKind::UnsupportedSubTarget)
-    }
-
     fn expected_left_paren(&self) -> ParseError<'a> {
         self.parse_error(ParseErrorKind::ExpectedLeftParen)
     }
@@ -1055,9 +1051,12 @@ impl<'a> Parser<'a> {
         self.next_token();
         let replacement = self.parse_expression()?;
 
-        if self.current_token.kind == TokenKind::Comma {
-            return Err(self.unsupported_sub_target());
-        }
+        let target = if self.current_token.kind == TokenKind::Comma {
+            self.next_token();
+            Some(self.parse_expression()?)
+        } else {
+            None
+        };
 
         if self.current_token.kind != TokenKind::RightParen {
             return Err(self.expected_right_paren());
@@ -1067,6 +1066,7 @@ impl<'a> Parser<'a> {
         Ok(Statement::Sub {
             pattern,
             replacement,
+            target,
         })
     }
 
@@ -1700,15 +1700,12 @@ mod tests {
     }
 
     #[test]
-    fn parse_sub_with_target_returns_parse_error() {
+    fn parse_sub_with_target() {
         let mut parser = Parser::new(Lexer::new(r#"BEGIN { sub(/a/, "b", t) }"#));
 
-        let err = parser
-            .try_parse_program()
-            .expect_err("expected parse error for unsupported sub target argument");
+        let program = parser.parse_program();
 
-        assert_eq!(err.kind, ParseErrorKind::UnsupportedSubTarget);
-        assert_eq!(err.token.kind, TokenKind::Comma);
+        assert_eq!(r#"BEGIN { sub(/a/, "b", t) }"#, program.to_string());
     }
 
     #[test]

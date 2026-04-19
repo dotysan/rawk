@@ -371,8 +371,9 @@ impl<'a> Evaluator<'a> {
             Statement::Sub {
                 pattern,
                 replacement,
+                target,
             } => {
-                self.eval_sub(pattern, replacement);
+                self.eval_sub(pattern, replacement, target.as_ref());
                 Vec::new()
             }
             Statement::Gsub {
@@ -1046,12 +1047,12 @@ impl<'a> Evaluator<'a> {
         }
     }
 
-    fn eval_sub(&mut self, pattern: &Expression<'_>, replacement: &Expression<'_>) {
-        let line = match self.current_line.as_ref() {
-            Some(value) => value.clone(),
-            None => return,
-        };
-
+    fn eval_sub(
+        &mut self,
+        pattern: &Expression<'_>,
+        replacement: &Expression<'_>,
+        target: Option<&Expression<'_>>,
+    ) {
         let pattern = match pattern {
             Expression::Regex(value) => value.to_string(),
             _ => self.eval_expression(pattern),
@@ -1061,8 +1062,30 @@ impl<'a> Evaluator<'a> {
             return;
         }
         let replacement = unescape_awk_string(&self.eval_expression(replacement));
-        let replaced = awk_sub_replace_first(&line, &pattern, &replacement);
-        self.current_line = Some(replaced);
+        match target {
+            Some(Expression::Identifier(identifier)) => {
+                let value = self.eval_identifier_expression(identifier);
+                let replaced = awk_sub_replace_first(&value, &pattern, &replacement);
+                self.set_variable_text(identifier, replaced);
+            }
+            Some(Expression::Field(inner)) => {
+                let line = self.eval_field_expression(inner);
+                let replaced = awk_sub_replace_first(&line, &pattern, &replacement);
+                self.assign_field(inner, replaced);
+            }
+            Some(other) => {
+                let value = self.eval_expression(other);
+                let _ = awk_sub_replace_first(&value, &pattern, &replacement);
+            }
+            None => {
+                let line = match self.current_line.as_ref() {
+                    Some(value) => value.clone(),
+                    None => return,
+                };
+                let replaced = awk_sub_replace_first(&line, &pattern, &replacement);
+                self.current_line = Some(replaced);
+            }
+        }
     }
 
     fn eval_system(&mut self, command: &Expression<'_>) {
