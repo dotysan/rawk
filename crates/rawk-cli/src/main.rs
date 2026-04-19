@@ -102,13 +102,10 @@ fn stdin_mode(script: &str, field_separator: Option<String>) {
     };
 
     let stdin = io::stdin();
-    let input_lines: Vec<String> = stdin.lock().lines().map_while(Result::ok).collect();
+    let input_lines = stdin.lock().lines().map_while(Result::ok);
 
-    let (output_lines, runtime_error) = awk.run(input_lines, None, field_separator);
-
-    for line in output_lines {
-        println!("{}", line);
-    }
+    let stdout = io::stdout();
+    let runtime_error = awk.run_to_writer(input_lines, None, field_separator, Box::new(stdout));
 
     if let Some(err) = runtime_error {
         eprintln!("rawk: {err}");
