@@ -1,3 +1,4 @@
+use std::io::BufRead;
 use std::{io, path};
 
 use clap::{CommandFactory, Parser};
@@ -56,20 +57,16 @@ fn main() -> io::Result<()> {
 }
 
 fn execute(script: &str, path: &path::Path, field_separator: Option<String>) -> io::Result<()> {
-    let input_lines = std::fs::read_to_string(path)
-        .expect("Failed to read input file")
+    let file = std::fs::File::open(path).expect("Failed to read input file");
+    let input_lines = io::BufReader::new(file)
         .lines()
-        .map(|line| line.to_string())
-        .collect::<Vec<String>>();
+        .map_while(Result::ok);
 
     let awk = Awk::new(script)
         .map_err(|err| io::Error::new(io::ErrorKind::InvalidInput, err.to_string()))?;
     let filename = display_filename(path);
-    let (output_lines, runtime_error) = awk.run(input_lines, Some(filename), field_separator);
-
-    for line in output_lines {
-        println!("{}", line);
-    }
+    let stdout = io::stdout();
+    let runtime_error = awk.run_to_writer(input_lines, Some(filename), field_separator, Box::new(stdout));
 
     if let Some(err) = runtime_error {
         eprintln!("rawk: {err}");

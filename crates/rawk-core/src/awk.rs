@@ -1,4 +1,5 @@
 use crate::{Evaluator, Lexer, ParseError, Parser, Program};
+use std::io::Write;
 
 /// High-level wrapper for compiling and running an AWK script.
 ///
@@ -71,7 +72,7 @@ impl Awk {
     /// collected before the error is still returned alongside the error message.
     pub fn run(
         &self,
-        input: Vec<String>,
+        input: impl IntoIterator<Item = String> + 'static,
         filename: Option<String>,
         field_separator: Option<String>,
     ) -> (Vec<String>, Option<String>) {
@@ -83,5 +84,25 @@ impl Awk {
 
         let output = evaluator.eval();
         (output, evaluator.runtime_error().map(str::to_string))
+    }
+
+    /// Like [`run`](Self::run), but writes output directly to the given writer
+    /// instead of collecting it. This avoids buffering all output in memory.
+    pub fn run_to_writer(
+        &self,
+        input: impl IntoIterator<Item = String> + 'static,
+        filename: Option<String>,
+        field_separator: Option<String>,
+        writer: Box<dyn Write>,
+    ) -> Option<String> {
+        let filename = filename.unwrap_or_else(|| "-".to_string());
+        let mut evaluator = Evaluator::new(self.program.clone(), input, filename)
+            .with_writer(writer);
+        if let Some(fs) = field_separator {
+            evaluator = evaluator.with_field_separator(fs);
+        }
+
+        evaluator.eval();
+        evaluator.runtime_error().map(str::to_string)
     }
 }

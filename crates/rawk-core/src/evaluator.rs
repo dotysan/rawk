@@ -6,6 +6,7 @@ use crate::{
 use regex::Regex;
 use std::cell::Cell;
 use std::collections::HashMap;
+use std::io::Write;
 
 struct FunctionCallResult {
     value: String,
@@ -19,7 +20,7 @@ struct ComparisonOperand {
 
 pub struct Evaluator<'a> {
     program: Program<'a>,
-    input_lines: Vec<String>,
+    input_iter: Box<dyn Iterator<Item = String>>,
     input_cursor: usize,
     current_line_number: Cell<usize>,
     current_line: Option<String>,
@@ -43,18 +44,19 @@ pub struct Evaluator<'a> {
     return_value: Option<String>,
     has_output: bool,
     runtime_error: Option<String>,
+    output_writer: Option<Box<dyn Write>>,
 }
 
 impl<'a> Evaluator<'a> {
     pub fn new(
         program: Program<'a>,
-        input_lines: Vec<String>,
+        input: impl IntoIterator<Item = String> + 'static,
         current_filename: impl Into<String>,
     ) -> Self {
         let current_filename = current_filename.into();
         Self {
             program,
-            input_lines,
+            input_iter: Box::new(input.into_iter()),
             input_cursor: 0,
             current_line_number: Cell::new(0),
             current_line: None,
@@ -78,7 +80,13 @@ impl<'a> Evaluator<'a> {
             return_value: None,
             has_output: false,
             runtime_error: None,
+            output_writer: None,
         }
+    }
+
+    pub fn with_writer(mut self, writer: Box<dyn Write>) -> Self {
+        self.output_writer = Some(writer);
+        self
     }
 
     pub fn with_field_separator(mut self, fs: String) -> Self {
@@ -138,7 +146,7 @@ impl<'a> Evaluator<'a> {
         }
 
         if !self.exited {
-            self.current_line_number.set(self.input_lines.len());
+            self.current_line_number.set(self.input_cursor);
         }
         self.current_line = None;
 
@@ -164,7 +172,7 @@ impl<'a> Evaluator<'a> {
     }
 
     fn read_next_input_record(&mut self) -> Option<String> {
-        let input_line = self.input_lines.get(self.input_cursor)?.clone();
+        let input_line = self.input_iter.next()?;
         self.input_cursor += 1;
         self.current_line_number.set(self.input_cursor);
         self.current_line = Some(input_line.clone());
@@ -297,7 +305,14 @@ impl<'a> Evaluator<'a> {
         if generated.is_empty() {
             return;
         }
-        output.extend(generated);
+        if let Some(writer) = self.output_writer.as_mut() {
+            for s in &generated {
+                let _ = writer.write_all(s.as_bytes());
+            }
+            let _ = writer.flush();
+        } else {
+            output.extend(generated);
+        }
         self.has_output = true;
     }
 
