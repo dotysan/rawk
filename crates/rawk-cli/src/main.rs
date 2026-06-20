@@ -1,3 +1,4 @@
+use std::io::{BufRead, IsTerminal};
 use std::{io, path};
 
 use clap::{CommandFactory, Parser};
@@ -26,8 +27,8 @@ fn main() -> io::Result<()> {
         match args.args.as_slice() {
             [input] => (script, input.clone()),
             _ => {
-                // No input file provided only script, enter interactive mode
-                interactive_mode(&script, args.field_separator);
+                // No input file provided, read from stdin
+                run_stdin(&script, args.field_separator);
 
                 return Ok(());
             }
@@ -36,8 +37,8 @@ fn main() -> io::Result<()> {
         match args.args.as_slice() {
             [script, input] => (script.clone(), input.clone()),
             [script] => {
-                // No input file provided only script, enter interactive mode
-                interactive_mode(script, args.field_separator);
+                // No input file provided, read from stdin
+                run_stdin(script, args.field_separator);
 
                 return Ok(());
             }
@@ -85,6 +86,37 @@ fn display_filename(path: &path::Path) -> String {
         .unwrap_or_else(|| path.to_path_buf());
 
     relative.to_string_lossy().replace('\\', "/")
+}
+
+fn run_stdin(script: &str, field_separator: Option<String>) {
+    if io::stdin().is_terminal() {
+        interactive_mode(script, field_separator);
+    } else {
+        stdin_mode(script, field_separator);
+    }
+}
+
+fn stdin_mode(script: &str, field_separator: Option<String>) {
+    let awk = match Awk::new(script) {
+        Ok(awk) => awk,
+        Err(err) => {
+            eprintln!("{err}");
+            return;
+        }
+    };
+
+    let stdin = io::stdin();
+    let input_lines: Vec<String> = stdin.lock().lines().map_while(Result::ok).collect();
+
+    let (output_lines, runtime_error) = awk.run(input_lines, None, field_separator);
+
+    for line in output_lines {
+        println!("{}", line);
+    }
+
+    if let Some(err) = runtime_error {
+        eprintln!("rawk: {err}");
+    }
 }
 
 fn interactive_mode(script: &str, field_separator: Option<String>) {
